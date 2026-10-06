@@ -20,7 +20,7 @@ jobs:
         run: python scripts/hf_snapshot.py
       - name: Commit if the model list changed
         run: |
-          # the date alone always changes; only commit when the models do
+          # skip the commit when only the generated date moved
           if python - <<'EOF'
           import json, subprocess, sys
           new = json.load(open("data/models.json"))["models"]

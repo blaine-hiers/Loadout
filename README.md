@@ -41,7 +41,7 @@ python scripts/hf_snapshot.py   # standard library only; writes data/models.json
 
 It pulls the top text-generation and image-text-to-text models by downloads and by likes, drops pre-quantized repos (GGUF, AWQ, GPTQ, FP8, MLX…) since precision is chosen in the app, then fetches each repo's `config.json` and keeps only what the math needs. Gated repos (Meta, Google) fall back to the matching `unsloth/` mirror for their config. Repos with no standard `config.json` are skipped.
 
-The **Refresh model snapshot** workflow re-runs it every Monday and commits only when the model list actually changed, which redeploys the site.
+The **Refresh model snapshot** workflow re-runs it every Monday, commits the refreshed list (download counts move every week, so it nearly always changes) and redeploys the site.
 
 ## The math
 
