@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Which local LLMs fit your GPUs? Pick your cards and get every popular Hugging Face model ranked by best fit, at any precision.">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Loadout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Schibsted+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: control sidebar (hardware, workload, precision, runtime) beside a ranked, searchable model list; every row carries a VRAM bar. */
+:root {
+  --bg: #eceff4; --panel: #ffffff; --panel-2: #f5f7fa; --ink: #141c28; --muted: #5a6575; --line: #d3d9e2;
+  --accent: #2c4bd8; --accent-ink: #ffffff; --accent-soft: #e2e7fb;
+  --seg-w: #3550d6; --seg-kv: #14958b; --seg-oh: #9aa3b1; --free: #e6eaf0;
+  --fit: #17824a; --fit-soft: #dcf1e5; --slow: #a86b0c; --slow-soft: #f7ecd7;
+  --off: #b9521a; --off-soft: #f8e3d6; --none: #a8323a; --none-soft: #f5dfe1;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e131a; --panel: #161d27; --panel-2: #1b2430; --ink: #e5eaf1; --muted: #93a0b2; --line: #2a3543;
+  --accent: #7d94ff; --accent-ink: #0e131a; --accent-soft: #232d4a;
+  --seg-w: #6f87ff; --seg-kv: #34c0b3; --seg-oh: #66717f; --free: #222b37;
+  --fit: #4fcf86; --fit-soft: #183325; --slow: #e3a845; --slow-soft: #352a15;
+  --off: #f08a52; --off-soft: #3a2316; --none: #f0727b; --none-soft: #3a1c20; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e131a; --panel: #161d27; --panel-2: #1b2430; --ink: #e5eaf1; --muted: #93a0b2; --line: #2a3543;
+  --accent: #7d94ff; --accent-ink: #0e131a; --accent-soft: #232d4a;
+  --seg-w: #6f87ff; --seg-kv: #34c0b3; --seg-oh: #66717f; --free: #222b37;
+  --fit: #4fcf86; --fit-soft: #183325; --slow: #e3a845; --slow-soft: #352a15;
+  --off: #f08a52; --off-soft: #3a2316; --none: #f0727b; --none-soft: #3a1c20; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14.5px; line-height: 1.5 }
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 60px; display: grid; gap: 16px }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums }
+button, select, input { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+a { color: var(--accent) }
+
+header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; justify-content: space-between }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap }
+.brand h1 { font-family: var(--f-display); font-weight: 800; font-size: 30px; letter-spacing: -0.02em; margin: 0 }
+.brand .tag { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase }
+.tabs { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px }
+.tabs button { border: 0; background: transparent; padding: 7px 14px; border-radius: 7px; font-weight: 600; color: var(--muted) }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink) }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px }
+.label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600 }
+.note { font-size: 12.5px; color: var(--muted) }
+
+.layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr) } }
+aside.side { position: sticky; top: env(safe-area-inset-top, 0px); max-height: 100vh; overflow-y: auto; display: grid; gap: 12px; padding-bottom: 8px }
+@media (max-width: 900px) { aside.side { position: static; max-height: none } }
+.sec { display: grid; gap: 11px }
+.sec h2 { font-family: var(--f-display); font-weight: 600; font-size: 16px; margin: 0 }
+.ctl { display: grid; gap: 4px }
+.ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px }
+.ctl-head output { font-family: var(--f-mono); font-size: 13px; font-weight: 600; color: var(--accent) }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 }
+.ticks { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 10.5px; color: var(--muted) }
+select, input[type="text"], input[type="number"], input[type="search"] { width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2) }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px }
+.seg button { border: 1px solid var(--line); background: var(--panel-2); padding: 4px 10px; border-radius: 999px; font-size: 12.5px }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink) }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px }
+.check input { margin-top: 3px; accent-color: var(--accent) }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+
+/* combobox */
+.combo { position: relative }
+.combo-list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.14); max-height: 320px; overflow-y: auto; padding: 4px }
+.combo-list button { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; border: 0; background: none; padding: 7px 9px; border-radius: 7px; font-size: 13.5px }
+.combo-list button[aria-selected="true"], .combo-list button:hover { background: var(--accent-soft) }
+.combo-list .sub { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); white-space: nowrap }
+.combo-list .grp { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 9px 2px }
+
+.cards { display: grid; gap: 6px }
+.cardrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2) }
+.cardrow .nm { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.cardrow .sp { font-family: var(--f-mono); font-size: 11px; color: var(--muted) }
+.stepper { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--panel) }
+.stepper button { border: 0; background: none; width: 26px; height: 28px; font-weight: 600 }
+.stepper span { min-width: 30px; display: grid; place-items: center; font-family: var(--f-mono); font-size: 12.5px; border-inline: 1px solid var(--line) }
+.x { border: 0; background: none; color: var(--muted); font-size: 16px; width: 26px; height: 28px; border-radius: 6px }
+.x:hover { background: var(--none-soft); color: var(--none) }
+
+/* results */
+main.res { display: grid; gap: 14px; min-width: 0 }
+.searchbar { display: grid; gap: 10px }
+.searchbar input[type="search"] { font-size: 16px; padding: 11px 14px; border-radius: 10px; background: var(--panel) }
+.hint { font-size: 12px; color: var(--muted) }
+.hint code { font-family: var(--f-mono); font-size: 11.5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; cursor: pointer }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end }
+.filters .ctl { min-width: 0 }
+.filters select { width: auto }
+.summary { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; justify-content: space-between }
+.rig { font-family: var(--f-display); font-weight: 600; font-size: 18px }
+.counts { display: flex; flex-wrap: wrap; gap: 6px }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1px solid transparent; background: none }
+button.pill[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through }
+.pill .dot { width: 8px; height: 8px; border-radius: 50% }
+.s-fit { background: var(--fit-soft); color: var(--fit) } .s-fit .dot { background: var(--fit) }
+.s-slow { background: var(--slow-soft); color: var(--slow) } .s-slow .dot { background: var(--slow) }
+.s-off { background: var(--off-soft); color: var(--off) } .s-off .dot { background: var(--off) }
+.s-none { background: var(--none-soft); color: var(--none) } .s-none .dot { background: var(--none) }
+
+.unlock-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px }
+.unlock-item { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--panel-2); display: grid; gap: 2px; min-width: 0 }
+.unlock-item .delta { font-family: var(--f-display); font-weight: 800; font-size: 20px; color: var(--fit) }
+.unlock-item .what { font-weight: 600 }
+.unlock-item .names { font-size: 12px; color: var(--muted); overflow-wrap: anywhere }
+
+.listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap }
+.listhead h2 { font-family: var(--f-display); font-weight: 600; font-size: 18px; margin: 0 }
+.rows { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden }
+.row { display: grid; grid-template-columns: 34px minmax(0, 1.6fr) 84px minmax(0, 1.4fr) 76px auto; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line) }
+.row:first-child { border-top: 0 }
+.row.pinned { background: var(--accent-soft) }
+.rank { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-align: right }
+.mname { font-weight: 600; overflow-wrap: anywhere }
+.mname .org { color: var(--muted); font-weight: 400 }
+.mmeta { font-size: 11.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 8px }
+.qchip { font-family: var(--f-mono); font-size: 12px; padding: 2px 7px; border-radius: 6px; justify-self: start; white-space: nowrap }
+.tps { font-family: var(--f-mono); font-size: 13px; text-align: right; white-space: nowrap }
+.tps small { color: var(--muted) }
+.actions { display: flex; gap: 5px; justify-content: flex-end; flex-wrap: wrap }
+.actions button, .actions a { border: 1px solid var(--line); background: var(--panel-2); border-radius: 7px; padding: 3px 8px; font-size: 12px; color: var(--ink); text-decoration: none; white-space: nowrap }
+.actions button[aria-expanded="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.actions .take { border-color: var(--accent); color: var(--accent); font-weight: 600 }
+@media (max-width: 760px) {
+  .row { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .row .bar-cell { grid-column: 2 / -1 }
+  .row .tps { grid-column: 2; text-align: left }
+  .row .actions { grid-column: 2 / -1; justify-content: flex-start }
+}
+.bar-cell { display: grid; gap: 3px; min-width: 0 }
+.bar { position: relative; height: 11px; border-radius: 4px; background: var(--free); display: flex; overflow: hidden }
+.bar i { display: block; height: 100% }
+.bar .w { background: var(--seg-w) } .bar .kv { background: var(--seg-kv) } .bar .oh { background: var(--seg-oh) }
+.bar.over { outline: 2px solid var(--none); outline-offset: 1px }
+.bar-cap { font-family: var(--f-mono); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px }
+.bar-cap .bad { color: var(--none); font-weight: 600 }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted) }
+.legend span { display: inline-flex; align-items: center; gap: 5px }
+.legend i { width: 12px; height: 8px; border-radius: 2px; display: inline-block }
+.more { justify-self: center; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px 18px; font-weight: 600 }
+
+.detail { grid-column: 1 / -1; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0 }
+.math { font-family: var(--f-mono); font-size: 12px; display: grid; gap: 3px; overflow-x: auto }
+.math div { white-space: pre }
+.math .res { font-weight: 600 }
+.fixes { display: grid; gap: 6px }
+.fix { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 7px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line) }
+.fix .mark { font-weight: 800; font-size: 15px; text-align: center }
+.fix.yes .mark { color: var(--fit) } .fix.warn .mark { color: var(--off) } .fix.no .mark { color: var(--none) }
+.fix.no .ftitle { color: var(--muted) }
+.fix .ftitle { font-weight: 600 }
+.fix .fmath { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere }
+.kind { font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 7px; border-radius: 5px; white-space: nowrap }
+.kind.free { background: var(--fit-soft); color: var(--fit) }
+.kind.slow { background: var(--off-soft); color: var(--off) }
+.kind.buy { background: var(--accent-soft); color: var(--accent) }
+.empty { padding: 16px; color: var(--muted) }
+
+/* pages tab */
+.pages { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; align-items: start }
+@media (max-width: 900px) { .pages { grid-template-columns: minmax(0, 1fr) } }
+.gpulist { display: grid; gap: 6px; max-height: 80vh; overflow-y: auto }
+@media (max-width: 900px) { .gpulist { max-height: 260px } }
+.gpulist h3 { margin: 6px 0 0 }
+.gpulist .g { display: flex; justify-content: space-between; gap: 8px; width: 100%; text-align: left; border: 0; background: transparent; padding: 5px 8px; border-radius: 7px; font-size: 13.5px }
+.gpulist .g span:last-child { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted) }
+.gpulist .g[aria-current="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600 }
+.browser { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; min-width: 0 }
+.urlbar { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--panel-2); border-bottom: 1px solid var(--line) }
+.urlbar .dots { display: flex; gap: 5px } .urlbar .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block }
+.urlbar .url { flex: 1; min-width: 0; font-family: var(--f-mono); font-size: 12.5px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.page { padding: 22px clamp(16px, 4vw, 34px) 30px; display: grid; gap: 16px; min-width: 0 }
+.crumbs { font-size: 13px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap }
+.crumbs button, .linkish { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; text-align: left }
+.page h2.q { font-family: var(--f-display); font-weight: 800; font-size: clamp(24px, 4vw, 34px); letter-spacing: -0.02em; line-height: 1.15; margin: 0; text-wrap: balance; overflow-wrap: anywhere }
+.answer { font-size: 17px; font-weight: 600; padding: 12px 16px; border-radius: 10px }
+.specs { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 14px; color: var(--muted) }
+.specs b { color: var(--ink); font-family: var(--f-mono); font-weight: 600 }
+.plist { display: grid; gap: 0 }
+.plist h3 { margin: 10px 0 4px; font-size: 14px; display: flex; gap: 8px; align-items: center }
+.plist .pi { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; padding: 7px 2px }
+.plist .pi:hover .mname { color: var(--accent) }
+.cmp { display: grid; gap: 6px; font-size: 14px }
+.stamp { font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 12px }
+footer.foot { font-size: 12.5px; color: var(--muted); max-width: 90ch }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Loadout</h1>
+      <span class="tag">Which local LLMs fit your GPUs · estimates, not benchmarks</span>
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="run">What can I run?</button>
+      <button role="tab" aria-selected="false" data-tab="pages">GPU pages</button>
+    </div>
+  </header>
+
+  <section id="view-run" class="layout">
+    <aside class="side">
+      <div class="panel sec">
+        <h2>Hardware</h2>
+        <div class="ctl">
+          <span class="label">Add a GPU</span>
+          <div class="combo">
+            <input type="search" id="gpu-q" placeholder="Type a GPU: 4090, M4 Max, 24 GB…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="gpu-list">
+            <div class="combo-list" id="gpu-list" role="listbox" hidden></div>
+          </div>
+        </div>
+        <div class="cards" id="cards"></div>
+        <div id="custom-box" class="two" hidden>
+          <label class="ctl"><span class="label">Custom VRAM GB</span><input type="number" id="cust-vram" min="1" max="2048" value="24"></label>
+          <label class="ctl"><span class="label">Bandwidth GB/s</span><input type="number" id="cust-bw" min="10" max="10000" value="1000"></label>
+        </div>
+        <div class="ctl"><div class="ctl-head"><span class="label">System RAM</span><output id="o-ram"></output></div><input type="range" id="r-ram"></div>
+        <div class="ctl"><span class="label">RAM speed (for offload)</span>
+          <select id="ram-bw"><option value="45">DDR4 dual-channel · ~45 GB/s</option><option value="70" selected>DDR5 dual-channel · ~70 GB/s</option><option value="200">DDR5 8-channel workstation · ~200 GB/s</option></select></div>
+        <div class="ctl"><div class="ctl-head"><span class="label">Usable VRAM</span><output id="o-util"></output></div><input type="range" id="r-util" min="70" max="100" step="1"><span class="note">Discrete cards. vLLM's default is 90%.</span></div>
+        <label class="check"><input type="checkbox" id="mac-raise"><span>Raise the macOS GPU memory limit (75% → 90% of unified memory)</span></label>
+      </div>
+
+      <div class="panel sec">
+        <h2>Workload</h2>
+        <div class="ctl"><div class="ctl-head"><span class="label">Context per user</span><output id="o-ctx"></output></div><input type="range" id="r-ctx"><div class="ticks"><span>1K</span><span>32K</span><span>1M</span></div></div>
+        <div class="ctl"><div class="ctl-head"><span class="label">Users at once</span><output id="o-users"></output></div><input type="range" id="r-users"><div class="ticks"><span>1</span><span>16</span><span>256</span></div></div>
+        <div class="ctl"><div class="ctl-head"><span class="label">Slowest speed you'll accept</span><output id="o-min"></output></div><input type="range" id="r-min"><span class="note">Per user. Reading speed is about 5–8 tok/s.</span></div>
+      </div>
+
+      <div class="panel sec">
+        <h2>Precision</h2>
+        <div class="ctl"><span class="label">Weight precision</span><select id="wq"></select></div>
+        <div class="ctl" id="floor-ctl"><span class="label">Auto: lowest quant allowed</span><select id="floor"></select></div>
+        <div class="ctl"><span class="label">KV cache precision</span><select id="kvq"></select></div>
+      </div>
+
+      <div class="panel sec">
+        <h2>Runtime</h2>
+        <div class="ctl"><span class="label">Multi-GPU split</span>
+          <div class="seg" id="split"><button data-v="layer">Layer split · llama.cpp, Ollama</button><button data-v="tp">Tensor parallel · vLLM, SGLang</button></div>
+          <span class="note">Layer split adds room, not speed. Tensor parallel adds both but needs matching cards in counts of 2, 4 or 8.</span></div>
+        <label class="check"><input type="checkbox" id="allow-off" checked><span>Allow offloading layers to system RAM</span></label>
+      </div>
+    </aside>
+
+    <main class="res">
+      <div class="panel searchbar">
+        <div class="combo">
+          <input type="search" id="mq" placeholder="Search Hugging Face models…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="m-list">
+          <div class="combo-list" id="m-list" role="listbox" hidden></div>
+        </div>
+        <div class="hint">Try <code>qwen coder</code> <code>org:google</code> <code>&lt;35b</code> <code>&gt;100b moe</code> <code>vision</code> <code>ctx&gt;200k</code> <code>lic:apache</code> <code>base</code>. Pick a suggestion to pin that model on top.</div>
+        <div class="filters">
+          <label class="ctl"><span class="label">Org</span><select id="f-org"></select></label>
+          <label class="ctl"><span class="label">Size</span><select id="f-size">
+            <option value="0-9999">Any size</option><option value="0-4">Under 4B</option><option value="4-10">4–10B</option><option value="10-20">10–20B</option><option value="20-40">20–40B</option><option value="40-100">40–100B</option><option value="100-9999">100B+</option></select></label>
+          <label class="ctl"><span class="label">Type</span><select id="f-kind"><option value="all">Chat + base</option><option value="chat">Chat / instruct</option><option value="base">Base only</option></select></label>
+          <label class="ctl"><span class="label">Architecture</span><select id="f-arch"><option value="any">Dense + MoE</option><option value="moe">MoE only</option><option value="dense">Dense only</option></select></label>
+          <label class="ctl"><span class="label">License</span><select id="f-lic"><option value="any">Any</option><option value="open">Apache / MIT only</option><option value="ungated">No gated repos</option></select></label>
+          <label class="ctl"><span class="label">Source</span><select id="f-src"><option value="all">Everyone</option><option value="labs">Original labs only</option></select></label>
+          <label class="ctl"><span class="label">Sort</span><select id="f-sort">
+            <option value="best">Best fit first</option><option value="fast">Fastest</option><option value="big">Biggest that runs</option><option value="room">Most VRAM to spare</option><option value="dl">Most downloaded</option><option value="new">Newest</option></select></label>
+        </div>
+      </div>
+
+      <div class="panel summary" id="summary"></div>
+      <div class="panel" id="unlock"></div>
+      <div class="legend">
+        <span><i style="background:var(--seg-w)"></i>weights</span><span><i style="background:var(--seg-kv)"></i>KV cache</span>
+        <span><i style="background:var(--seg-oh)"></i>runtime overhead</span><span><i style="background:var(--free)"></i>free</span><span>bar = your usable VRAM</span>
+      </div>
+      <div class="listhead"><h2 id="list-title"></h2><span class="note" id="list-note"></span></div>
+      <div class="rows" id="rows"></div>
+      <button class="more" id="more" hidden>Show 40 more</button>
+    </main>
+  </section>
+
+  <section id="view-pages" hidden>
+    <div class="pages">
+      <nav class="panel gpulist" aria-label="GPUs">
+        <input type="search" id="pg-q" placeholder="Filter GPUs…" autocomplete="off">
+        <div id="gpulist" style="display:grid;gap:2px"></div>
+      </nav>
+      <div class="browser">
+        <div class="urlbar"><div class="dots"><i></i><i></i><i></i></div><div class="url" id="url"></div></div>
+        <article class="page" id="page"></article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    Models: <span id="n-models"></span> text and vision models from the Hugging Face Hub (top by downloads and likes, pre-quantized repos removed), configs parsed on <span data-snap></span>.
+    Weights = params × bits ÷ 8. KV = layers × KV heads × head dim × 2 × bytes per token, with sliding-window layers capped and linear/Mamba layers holding none; MLA models store one latent per token.
+    MoE active params are estimated from the expert config. Speed = 75% of memory bandwidth ÷ bytes read per token.
+    Fit score = 10·log₁₀(capability × quant quality) + 1.2·log₁₀(downloads), where capability is params, or √(total × active) for MoE.
+    Sizing one model in depth? Use <a href="https://blaine-hiers.github.io/headroom/">Headroom</a>. Source: <a href="https://github.com/blaine-hiers/Loadout">github.com/blaine-hiers/Loadout</a>.
+  </footer>
+</div>
+
+<script>
+(async () => {
+const HF = "https://huggingface.co/";
+let SNAP;
+try { SNAP = await (await fetch("data/models.json")).json(); }
+catch (e) { document.querySelector("main.res").prepend(Object.assign(document.createElement("div"), { className: "panel", textContent: "Couldn't load data/models.json. Serve this folder over HTTP (python -m http.server) rather than opening the file directly." })); return; }
+const RAW = SNAP.models;
+document.querySelectorAll("[data-snap]").forEach(el => el.textContent = SNAP.generated);
+const MODELS = RAW.map(m => {
+  const [org, name] = m.id.split("/");
+  const lic = String(m.lic || "unknown").toLowerCase();
+  return { ...m, org, name, lic, slug: m.id.toLowerCase().replace(/[^a-z0-9]+/g, "-"), norm: m.id.toLowerCase().replace(/[-_.\s/]+/g, ""),
+    moe: !!m.a, cap: m.a ? Math.sqrt(m.p * m.a) : m.p, open: /apache|mit/.test(lic) };
+});
+document.getElementById("n-models").textContent = MODELS.length;
+const LABS = new Set(["Qwen","meta-llama","google","mistralai","microsoft","deepseek-ai","openai","nvidia","ibm-granite","allenai","HuggingFaceTB","zai-org","THUDM","moonshotai","tiiuae","CohereLabs","CohereForAI","LiquidAI","baidu","tencent","MiniMaxAI","stepfun-ai","internlm","01-ai","upstage","swiss-ai","apple","ServiceNow-AI","inclusionAI","XiaomiMiMo","LGAI-EXAONE","openbmb","bigcode","Snowflake","ByteDance-Seed","arcee-ai","EleutherAI","openai-community","meituan-longcat","rednote-hilab","kakaocorp","sarvamai","utter-project","Motif-Technologies","PrimeIntellect","ai21labs","nousresearch","NousResearch","mistral-community"]);
+
+const QUANTS = [
+  ["fp32",32,"Float"],["fp16",16,"Float"],["bf16",16,"Float"],
+  ["fp8",8,"8-bit"],["int8",8,"8-bit"],["q8_0",8.5,"8-bit"],
+  ["q6_k",6.56,"GGUF k-quants"],["q5_k_m",5.69,"GGUF k-quants"],["q5_k_s",5.54,"GGUF k-quants"],["q5_0",5.5,"GGUF k-quants"],["q4_k_m",4.85,"GGUF k-quants"],["q4_k_s",4.58,"GGUF k-quants"],["q4_0",4.5,"GGUF k-quants"],["q3_k_l",4.27,"GGUF k-quants"],["q3_k_m",3.91,"GGUF k-quants"],["q3_k_s",3.5,"GGUF k-quants"],["q2_k",2.63,"GGUF k-quants"],
+  ["iq4_nl",4.5,"GGUF i-quants"],["iq4_xs",4.25,"GGUF i-quants"],["iq3_m",3.66,"GGUF i-quants"],["iq3_xxs",3.06,"GGUF i-quants"],["iq2_m",2.7,"GGUF i-quants"],["iq2_xs",2.31,"GGUF i-quants"],["iq2_xxs",2.06,"GGUF i-quants"],["iq1_m",1.75,"GGUF i-quants"],["iq1_s",1.56,"GGUF i-quants"],
+  ["awq",4.25,"GPU 4-bit"],["gptq",4.25,"GPU 4-bit"],["mxfp4",4.25,"GPU 4-bit"],["nvfp4",4.5,"GPU 4-bit"],["bnb nf4",4.13,"GPU 4-bit"],
+  ["exl2 8.0bpw",8,"EXL2 / EXL3"],["exl2 6.0bpw",6,"EXL2 / EXL3"],["exl2 5.0bpw",5,"EXL2 / EXL3"],["exl2 4.0bpw",4,"EXL2 / EXL3"],["exl2 3.0bpw",3,"EXL2 / EXL3"],["exl2 2.5bpw",2.5,"EXL2 / EXL3"]
+];
+const BITS = Object.fromEntries(QUANTS.map(q => [q[0], q[1]]));
+const LADDER = ["bf16","q8_0","q6_k","q5_k_m","q4_k_m","iq4_xs","q3_k_m","iq3_xxs","q2_k","iq2_xxs","iq1_m"];
+const KVQ = [["fp32",4],["fp16",2],["bf16",2],["fp8",1],["q8_0",1.0625],["q5_1",0.75],["q4_0",0.5625]];
+const QUAL = [[1.56,.45],[2.06,.58],[2.63,.72],[3.06,.82],[3.5,.88],[3.91,.92],[4.25,.945],[4.85,.965],[5.69,.98],[6.56,.99],[8,1],[32,1]];
+function qual(b) { for (let i = 1; i < QUAL.length; i++) if (b <= QUAL[i][0]) { const [x0,y0] = QUAL[i-1], [x1,y1] = QUAL[i]; return y0 + (y1 - y0) * (b - x0) / (x1 - x0); } return b < QUAL[0][0] ? QUAL[0][1] : 1; }
+
+// name, group, VRAM GB, bandwidth GB/s, unified-memory usable fraction (unified only)
+const GPUS = [
+  ["RTX 2060","NVIDIA GeForce",6,336],["RTX 2070","NVIDIA GeForce",8,448],["RTX 2080 Ti","NVIDIA GeForce",11,616],
+  ["RTX 3060 12GB","NVIDIA GeForce",12,360],["RTX 3060 Ti","NVIDIA GeForce",8,448],["RTX 3070","NVIDIA GeForce",8,448],["RTX 3080","NVIDIA GeForce",10,760],["RTX 3080 Ti","NVIDIA GeForce",12,912],["RTX 3090","NVIDIA GeForce",24,936],["RTX 3090 Ti","NVIDIA GeForce",24,1008],
+  ["RTX 4060","NVIDIA GeForce",8,272],["RTX 4060 Ti 16GB","NVIDIA GeForce",16,288],["RTX 4070","NVIDIA GeForce",12,504],["RTX 4070 Super","NVIDIA GeForce",12,504],["RTX 4070 Ti Super","NVIDIA GeForce",16,672],["RTX 4080","NVIDIA GeForce",16,717],["RTX 4080 Super","NVIDIA GeForce",16,736],["RTX 4090","NVIDIA GeForce",24,1008],
+  ["RTX 5060 Ti 16GB","NVIDIA GeForce",16,448],["RTX 5070","NVIDIA GeForce",12,672],["RTX 5070 Ti","NVIDIA GeForce",16,896],["RTX 5080","NVIDIA GeForce",16,960],["RTX 5090","NVIDIA GeForce",32,1792],
+  ["RTX A4000","NVIDIA workstation",16,448],["RTX A5000","NVIDIA workstation",24,768],["RTX A6000","NVIDIA workstation",48,768],["RTX 4000 Ada","NVIDIA workstation",20,360],["RTX 6000 Ada","NVIDIA workstation",48,960],["RTX PRO 6000 Blackwell","NVIDIA workstation",96,1792],["Tesla P40","NVIDIA workstation",24,347],["Tesla V100 32GB","NVIDIA workstation",32,900],
+  ["Radeon RX 7600 XT","AMD Radeon",16,288],["Radeon RX 7800 XT","AMD Radeon",16,624],["Radeon RX 7900 XT","AMD Radeon",20,800],["Radeon RX 7900 XTX","AMD Radeon",24,960],["Radeon RX 9070 XT","AMD Radeon",16,640],["Radeon AI PRO R9700","AMD Radeon",32,640],
+  ["Intel Arc A770","Intel Arc",16,560],["Intel Arc B580","Intel Arc",12,456],
+  ["Apple M1 Max 64GB","Apple silicon",64,400,0.75],["Apple M1 Ultra 128GB","Apple silicon",128,800,0.75],["Apple M2 Max 96GB","Apple silicon",96,400,0.75],["Apple M2 Ultra 192GB","Apple silicon",192,800,0.75],["Apple M3 Max 128GB","Apple silicon",128,400,0.75],["Apple M3 Ultra 512GB","Apple silicon",512,819,0.75],["Apple M4 Pro 64GB","Apple silicon",64,273,0.75],["Apple M4 Max 128GB","Apple silicon",128,546,0.75],
+  ["Ryzen AI Max+ 395 128GB","Unified-memory PCs",128,256,0.75],["NVIDIA DGX Spark","Unified-memory PCs",128,273,0.85],
+  ["Tesla T4","Datacenter",16,320],["L4","Datacenter",24,300],["A10","Datacenter",24,600],["L40S","Datacenter",48,864],["A100 40GB","Datacenter",40,1555],["A100 80GB","Datacenter",80,2039],["H100 PCIe","Datacenter",80,2000],["H100 SXM","Datacenter",80,3350],["H200","Datacenter",141,4800],["B200","Datacenter",192,8000],["AMD MI300X","Datacenter",192,5300]
+].map(([name, group, vram, bw, uni]) => ({ name, group, vram, bw, uni, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-") }));
+const GROUPS = [...new Set(GPUS.map(g => g.group))];
+const CUSTOM = { name: "Custom card", group: "Custom", vram: 24, bw: 1000, slug: "custom" };
+const gpu = n => n === CUSTOM.name ? CUSTOM : GPUS.find(g => g.name === n);
+
+// ---------- sliders ----------
+const V = {
+  ram: [0,8,16,32,48,64,96,128,192,256,384,512],
+  ctx: [1,2,4,8,16,32,64,128,256,512,1024],
+  users: [1,2,3,4,5,6,8,10,12,16,20,24,32,40,48,64,96,128,160,192,256],
+  min: [1,2,3,5,8,10,15,20,25,30,40,50,60,80,100]
+};
+
+const S = {
+  cards: [{ g: "RTX 4090", n: 1 }], ram: 64, ramBw: 70, util: 95, macRaise: false,
+  ctx: 8, users: 1, minTps: 10, wq: "auto", floor: "q4_k_m", kvq: "fp16", split: "layer", offload: true,
+  q: "", org: "all", size: "0-9999", kind: "all", arch: "any", lic: "any", src: "all", sort: "best",
+  show: { fit: true, slow: true, off: true, none: false }, limit: 40, open: null, pin: null,
+  tab: "run", page: { kind: "gpu", gpu: "rtx-4090", model: null }
+};
+try { const t = localStorage.getItem("loadout-tab"); if (t === "run" || t === "pages") S.tab = t; } catch (e) {}
+
+// ---------- math ----------
+const fmt = (x, d = 1) => Number(x).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fint = x => Math.round(x).toLocaleString("en-US");
+const fctx = k => k >= 1024 ? (k / 1024) + "M" : k + "K";
+const fdl = n => n >= 1e6 ? fmt(n / 1e6, 1) + "M" : n >= 1e3 ? fint(n / 1e3) + "K" : String(n);
+
+function cfgFrom(s) {
+  return { ctx: s.ctx, users: s.users, kvB: Object.fromEntries(KVQ)[s.kvq], kvq: s.kvq, wq: s.wq, floor: s.floor, minTps: s.minTps,
+    offload: s.offload, ram: s.ram, ramBw: s.ramBw, util: s.util, macRaise: s.macRaise, split: s.split };
+}
+const PAGE_CFG = { ctx: 8, users: 1, kvB: 2, kvq: "fp16", wq: "auto", floor: "q4_k_m", minTps: 10, offload: true, ram: 64, ramBw: 70, util: 95, macRaise: false, split: "layer" };
+
+function rig(cards, o) {
+  const parts = cards.map(c => {
+    const g = gpu(c.g);
+    const f = g.uni ? (g.group === "Apple silicon" && o.macRaise ? 0.9 : g.uni) : o.util / 100;
+    return { g, n: c.n, f, usable: g.vram * f * c.n };
+  });
+  const usable = parts.reduce((s, p) => s + p.usable, 0);
+  const raw = parts.reduce((s, p) => s + p.g.vram * p.n, 0);
+  const count = parts.reduce((s, p) => s + p.n, 0);
+  const unified = parts.some(p => p.g.uni);
+  const tpOk = o.split === "tp" && parts.length === 1 && [2, 4, 8].includes(count);
+  const effBW = tpOk ? parts[0].g.bw * count * 0.85 : 1 / parts.reduce((s, p) => s + (p.usable / usable) / p.g.bw, 0);
+  return { parts, usable, raw, count, unified, tp: tpOk, effBW };
+}
+function kvLayers(m) { const [sl, win] = m.slide || [0, 0]; return { full: m.L - sl - (m.noKv || 0), sl, win }; }
+function kvPerTokLayer(m, kvB) { return m.mla ? m.mla * kvB : 2 * m.kvh * m.hd * kvB; }
+function kvReqGB(m, ctxTok, kvB) { const { full, sl, win } = kvLayers(m); return (full * ctxTok + sl * Math.min(ctxTok, win)) * kvPerTokLayer(m, kvB) / 1e9; }
+function evalAt(m, R, q, o) {
+  const bits = BITS[q], ctxTok = o.ctx * 1024;
+  const weights = m.p * bits / 8, active = (m.a || m.p) * bits / 8;
+  const kvReq = kvReqGB(m, ctxTok, o.kvB), kv = kvReq * o.users;
+  const overhead = (R.tp ? 1.0 : 0.5) + 0.4 * R.count + 0.000004 * ctxTok * Math.min(o.users, 4);
+  const total = weights + kv + overhead;
+  const tps = 0.75 * R.effBW / (active + kv);
+  return { q, bits, weights, active, kvReq, kv, overhead, total, usable: R.usable, fits: total <= R.usable, tps, ctxTok };
+}
+function tryList(o) {
+  if (o.wq !== "auto") return [o.wq];
+  const fb = BITS[o.floor];
+  return LADDER.filter(q => BITS[q] >= fb);
+}
+function score(m, bits) { return 10 * Math.log10(m.cap * qual(bits)) + 1.2 * Math.log10(m.dl + 10); }
+function classify(m, R, o) {
+  const list = tryList(o);
+  if (o.ctx * 1024 > m.ctx) {
+    const e = evalAt(m, R, list[list.length - 1], { ...o, ctx: Math.max(1, Math.floor(m.ctx / 1024)) });
+    return { st: "none", e, ctxLimit: true, why: `max context ${fctx(Math.round(m.ctx / 1024))}`, sc: score(m, e.bits) - 100 };
+  }
+  for (const q of list) {
+    const e = evalAt(m, R, q, o);
+    if (e.fits) return { st: e.tps >= o.minTps ? "fit" : "slow", e, sc: score(m, e.bits) };
+  }
+  const e = evalAt(m, R, list[list.length - 1], o);
+  const room = R.usable - e.kv - e.overhead;
+  const ramAvail = Math.max(0, o.ram * 0.85 - 6);
+  if (o.offload && !R.unified && room > 0.5 && e.weights - room <= ramAvail) {
+    const frac = e.active / e.weights;
+    const tps = 0.75 / ((room * frac + e.kv) / R.effBW + (e.weights - room) * frac / o.ramBw);
+    return { st: "off", e, off: { room, spill: e.weights - room, tps, ramAvail }, sc: score(m, e.bits) - 30 };
+  }
+  return { st: "none", e, short: e.total - R.usable, sc: score(m, e.bits) - 60 };
+}
+
+// ---------- search ----------
+function parseQuery(q) {
+  const f = { words: [], org: null, lic: null, pmin: null, pmax: null, cmin: null, cmax: null, flags: new Set() };
+  for (const t of q.toLowerCase().split(/\s+/).filter(Boolean)) {
+    let mm;
+    if ((mm = t.match(/^org:(.+)$/))) f.org = mm[1];
+    else if ((mm = t.match(/^lic(?:ense)?:(.+)$/))) f.lic = mm[1];
+    else if ((mm = t.match(/^([<>])=?(\d+(?:\.\d+)?)b$/))) mm[1] === "<" ? f.pmax = +mm[2] : f.pmin = +mm[2];
+    else if ((mm = t.match(/^ctx([<>])=?(\d+)(k|m)$/))) { const v = +mm[2] * (mm[3] === "m" ? 1024 : 1) * 1024; mm[1] === "<" ? f.cmax = v : f.cmin = v; }
+    else if (["moe","dense","vision","chat","base","gated","instruct"].includes(t)) f.flags.add(t === "instruct" ? "chat" : t);
+    else f.words.push(t.replace(/[-_.\s/]+/g, ""));
+  }
+  return f;
+}
+function matchQ(m, f) {
+  if (f.org && !m.org.toLowerCase().includes(f.org)) return false;
+  if (f.lic && !m.lic.includes(f.lic)) return false;
+  if (f.pmin != null && m.p < f.pmin) return false;
+  if (f.pmax != null && m.p > f.pmax) return false;
+  if (f.cmin != null && m.ctx < f.cmin) return false;
+  if (f.cmax != null && m.ctx > f.cmax) return false;
+  if (f.flags.has("moe") && !m.moe) return false;
+  if (f.flags.has("dense") && m.moe) return false;
+  if (f.flags.has("vision") && !m.vision) return false;
+  if (f.flags.has("chat") && !m.chat) return false;
+  if (f.flags.has("base") && m.chat) return false;
+  if (f.flags.has("gated") && !m.gated) return false;
+  return f.words.every(w => m.norm.includes(w));
+}
+function filtered() {
+  const f = parseQuery(S.q);
+  const [lo, hi] = S.size.split("-").map(Number);
+  return MODELS.filter(m =>
+    (S.org === "all" || m.org === S.org) && m.p >= lo && m.p < hi &&
+    (S.kind === "all" || (S.kind === "chat" ? m.chat : !m.chat)) &&
+    (S.arch === "any" || (S.arch === "moe" ? m.moe : !m.moe)) &&
+    (S.lic === "any" || (S.lic === "open" ? m.open : !m.gated)) &&
+    (S.src === "all" || LABS.has(m.org)) && matchQ(m, f));
+}
+const ST_ORDER = { fit: 0, slow: 1, off: 2, none: 3 };
+const ST_NAME = { fit: "Runs well", slow: "Fits, too slow", off: "With offload", none: "Won't fit" };
+function sorted(rows) {
+  const k = S.sort;
+  const val = r => k === "fast" ? (r.c.off ? r.c.off.tps : r.c.e.tps) : k === "big" ? r.m.p : k === "room" ? r.c.e.usable - r.c.e.total : k === "dl" ? r.m.dl : k === "new" ? Date.parse(r.m.date || 0) : r.c.sc;
+  return rows.sort((a, b) => (ST_ORDER[a.c.st] - ST_ORDER[b.c.st]) || (val(b) - val(a)));
+}
+
+// ---------- fixes ----------
+function fixesFor(m, cards, o) {
+  const R = rig(cards, o), base = classify(m, R, o), out = [];
+  const tq = tryList(o).slice(-1)[0];
+  const target = `fully in VRAM at ${tq} or better`;
+  if (base.ctxLimit) {
+    out.push({ kind: "free", st: "no", t: `Use ${fctx(Math.floor(m.ctx / 1024))} context or less`, d: `${m.name} supports at most ${fint(m.ctx)} tokens` });
+    return { target, list: out };
+  }
+  const ctxs = V.ctx.filter(c => c < o.ctx).reverse();
+  if (ctxs.length) {
+    const hit = ctxs.map(c => ({ c, e: evalAt(m, R, tq, { ...o, ctx: c }) })).find(x => x.e.fits);
+    const lo = evalAt(m, R, tq, { ...o, ctx: ctxs[ctxs.length - 1] });
+    out.push(hit ? { kind: "free", st: "yes", t: `Drop context ${fctx(o.ctx)} → ${fctx(hit.c)}`, d: `needs ${fmt(hit.e.total)} of ${fmt(R.usable)} GB at ${tq} · ~${fint(hit.e.tps)} tok/s` }
+      : { kind: "free", st: "no", t: `Drop context to ${fctx(ctxs[ctxs.length - 1])}`, d: `still needs ${fmt(lo.total)} of ${fmt(R.usable)} GB; weights alone are ${fmt(lo.weights)} GB` });
+  }
+  if (o.users > 1) {
+    const e = evalAt(m, R, tq, { ...o, users: 1 });
+    out.push({ kind: "free", st: e.fits ? "yes" : "no", t: `Serve 1 user instead of ${o.users}`, d: `${fmt(e.total)} of ${fmt(R.usable)} GB` });
+  }
+  for (const [kq, kb] of [["q8_0", 1.0625], ["q4_0", 0.5625]]) if (kb < o.kvB) {
+    const e = evalAt(m, R, tq, { ...o, kvB: kb });
+    out.push({ kind: "free", st: e.fits ? "yes" : "no", t: `Store the KV cache as ${kq}`, d: `KV ${fmt(evalAt(m, R, tq, o).kv, 2)} → ${fmt(e.kv, 2)} GB · total ${fmt(e.total)} of ${fmt(R.usable)} GB` });
+    if (e.fits) break;
+  }
+  const lower = LADDER.filter(q => BITS[q] < BITS[tq]);
+  if (lower.length) {
+    const hit = lower.map(q => ({ q, e: evalAt(m, R, q, o) })).find(x => x.e.fits);
+    const last = evalAt(m, R, lower[lower.length - 1], o);
+    out.push(hit ? { kind: "free", st: "warn", t: `Go down to ${hit.q}`, d: `${fmt(hit.e.total)} of ${fmt(R.usable)} GB · fits, quality ≈ ${Math.round(qual(hit.e.bits) * 100)}% of full` }
+      : { kind: "free", st: "no", t: `Go down to ${lower[lower.length - 1]}`, d: `still needs ${fmt(last.total)} of ${fmt(R.usable)} GB` });
+  }
+  if (!R.unified) {
+    const e = evalAt(m, R, tq, o), room = R.usable - e.kv - e.overhead, ramAvail = Math.max(0, o.ram * 0.85 - 6), spill = e.weights - Math.max(room, 0);
+    if (room > 0.5 && spill <= ramAvail) {
+      const frac = e.active / e.weights, tps = 0.75 / ((room * frac + e.kv) / R.effBW + spill * frac / o.ramBw);
+      out.push({ kind: "slow", st: "warn", t: "Offload layers to system RAM", d: `${fmt(room)} GB on GPU + ${fmt(spill)} GB in RAM (${fint(ramAvail)} GB free of ${o.ram}) · ~${fmt(tps)} tok/s` });
+    } else out.push({ kind: "slow", st: "no", t: "Offload layers to system RAM", d: `would spill ${fmt(spill)} GB; ${fint(ramAvail)} GB of your ${o.ram} GB RAM is free for it` });
+    const first = cards[0];
+    let hit = null;
+    for (let k = 1; R.count + k <= 8; k++) {
+      const c2 = cards.map((c, i) => i === 0 ? { ...c, n: c.n + k } : c), R2 = rig(c2, o), e2 = evalAt(m, R2, tq, o);
+      if (e2.fits) { hit = { k, e2, R2 }; break; }
+    }
+    out.push(hit ? { kind: "buy", st: "yes", t: `Add ${hit.k} more ${first.g}${hit.k > 1 ? "s" : ""}`, d: `${fmt(hit.e2.total)} of ${fmt(hit.R2.usable)} GB · ~${fint(hit.e2.tps)} tok/s · +${gpu(first.g).vram * hit.k} GB` }
+      : { kind: "buy", st: "no", t: `Add more ${first.g}s`, d: "8 cards total still isn't enough" });
+  }
+  const cands = [];
+  for (const g of GPUS) for (const n of g.uni ? [1] : [1, 2, 4]) {
+    if (g.group === "Datacenter" && g.name !== "A100 80GB") continue;
+    const R2 = rig([{ g: g.name, n }], o);
+    if (R2.raw <= R.raw) continue;
+    const e2 = evalAt(m, R2, tq, o);
+    if (e2.fits) cands.push({ g, n, e2, R2 });
+  }
+  cands.sort((a, b) => a.R2.raw - b.R2.raw || b.e2.tps - a.e2.tps);
+  const seen = new Set(), pick = [];
+  for (const c of cands) { if (seen.has(c.g.name)) continue; seen.add(c.g.name); pick.push(c); if (pick.length === 3) break; }
+  pick.forEach(c => out.push({ kind: "buy", st: "yes", t: `Swap to ${c.n > 1 ? c.n + "× " : ""}${c.g.name}`, d: `${fmt(c.e2.total)} of ${fmt(c.R2.usable)} GB · ~${fint(c.e2.tps)} tok/s · ${c.R2.raw} GB total` }));
+  if (!pick.length) out.push({ kind: "buy", st: "no", t: "Swap to bigger owned hardware", d: "nothing up to 4 desktop cards, a Mac or a unified-memory PC holds it" });
+  const rank = f => (f.st === "no" ? 10 : 0) + ({ free: 0, slow: 1, buy: 2 })[f.kind] + (f.st === "warn" && f.kind === "free" ? 0.5 : 0);
+  return { target, list: out.sort((a, b) => rank(a) - rank(b)) };
+}
+
+function unlocks(list, o) {
+  const R = rig(S.cards, o);
+  const now = new Set(list.filter(m => classify(m, R, o).st === "fit").map(m => m.id));
+  const cands = [];
+  if (!R.unified && R.count < 8) {
+    cands.push({ label: `Add another ${S.cards[0].g}`, cards: S.cards.map((c, i) => i === 0 ? { ...c, n: c.n + 1 } : c), add: gpu(S.cards[0].g).vram });
+    for (const n of ["RTX 3090", "RTX 4090", "RTX 5090"]) if (n !== S.cards[0].g) cands.push({ label: `Add an ${n}`, cards: [...S.cards, { g: n, n: 1 }], add: gpu(n).vram });
+  }
+  for (const [n, c] of [["RTX 5090", 1], ["RTX 3090", 2], ["RTX PRO 6000 Blackwell", 1], ["Apple M4 Max 128GB", 1], ["Ryzen AI Max+ 395 128GB", 1], ["NVIDIA DGX Spark", 1], ["Apple M3 Ultra 512GB", 1]]) {
+    const raw = gpu(n).vram * c;
+    if (raw > R.raw) cands.push({ label: `Swap to ${c > 1 ? c + "× " : ""}${n}`, cards: [{ g: n, n: c }], add: raw - R.raw });
+  }
+  return cands.map(c => {
+    const R2 = rig(c.cards, o);
+    const gained = list.filter(m => !now.has(m.id) && classify(m, R2, o).st === "fit");
+    gained.sort((a, b) => b.cap - a.cap);
+    return { ...c, gained };
+  }).filter(c => c.gained.length).sort((a, b) => b.gained.length - a.gained.length || a.add - b.add).slice(0, 3);
+}
+
+// ---------- DOM helpers ----------
+const $ = id => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) el.append(k.nodeType ? k : document.createTextNode(k));
+  return el;
+};
+let raf = 0;
+function schedule() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
+
+function bar(e, over) {
+  const scale = Math.max(e.usable, e.total), pct = x => (100 * x / scale).toFixed(2) + "%";
+  const b = h("div", { class: "bar" + (over ? " over" : ""), role: "img", "aria-label": `${fmt(e.total)} of ${fmt(e.usable)} GB` },
+    h("i", { class: "w", style: `width:${pct(e.weights)}` }), h("i", { class: "kv", style: `width:${pct(e.kv)}` }), h("i", { class: "oh", style: `width:${pct(e.overhead)}` }));
+  if (over) b.append(h("i", { style: `position:absolute;left:${pct(e.usable)};top:-2px;bottom:-2px;width:2px;background:var(--none)` }));
+  return b;
+}
+function qchip(c) {
+  const cls = { fit: "s-fit", slow: "s-slow", off: "s-off", none: "s-none" }[c.st];
+  return h("span", { class: "qchip " + cls }, c.st === "none" ? (c.ctxLimit ? "ctx" : "—") : c.e.q);
+}
+function mathLines(m, c, R, o) {
+  const e = c.e, { full, sl, win } = kvLayers(m), per = kvPerTokLayer(m, o.kvB), L = [];
+  L.push(`weights  = ${fmt(m.p, 2)}B params × ${e.bits} bits (${e.q}) ÷ 8 = ${fmt(e.weights, 2)} GB`);
+  if (m.a) L.push(`active   = ${fmt(m.a, 2)}B of ${fmt(m.p, 1)}B per token (${m.E[1]} of ${m.E[0]} experts) = ${fmt(e.active, 2)} GB read per token`);
+  L.push(`KV/token = ${m.mla ? `${m.L} layers × ${m.mla} latent × ${o.kvB} B` : `${full} full${sl ? ` + ${sl} sliding (window ${win})` : ""}${m.noKv ? ` + ${m.noKv} linear/Mamba (no KV)` : ""} layers × 2 × ${m.kvh} KV heads × ${m.hd} dim × ${o.kvB} B`}`);
+  L.push(`KV       = ${o.users} user${o.users > 1 ? "s" : ""} × ${fint(e.ctxTok)} tokens (${o.kvq})       = ${fmt(e.kv, 2)} GB`);
+  L.push(`overhead = runtime + ${R.count} card${R.count > 1 ? "s" : ""} + compute buffer        = ${fmt(e.overhead, 2)} GB`);
+  L.push(`total    = ${fmt(e.weights, 2)} + ${fmt(e.kv, 2)} + ${fmt(e.overhead, 2)}                 = ${fmt(e.total, 2)} GB`);
+  L.push(`usable   = ${R.parts.map(p => `${p.n}× ${p.g.vram} GB × ${p.f}`).join(" + ")} = ${fmt(R.usable, 2)} GB`);
+  const res = [];
+  if (c.off) res.push(`offload  = ${fmt(c.off.room)} GB on GPU, ${fmt(c.off.spill)} GB in RAM at ${o.ramBw} GB/s → ~${fmt(c.off.tps)} tok/s`);
+  else if (e.fits) {
+    res.push(`headroom = ${fmt(e.usable, 2)} − ${fmt(e.total, 2)} = ${fmt(e.usable - e.total, 2)} GB free`);
+    res.push(`speed    ≈ 0.75 × ${fint(R.effBW)} GB/s${R.tp ? " (tensor parallel)" : ""} ÷ (${fmt(e.active, 2)} + ${fmt(e.kv, 2)}) GB = ~${fint(e.tps)} tok/s per user`);
+  } else if (!c.ctxLimit) res.push(`short by = ${fmt(e.total - e.usable, 2)} GB at ${e.q}, the lowest precision allowed`);
+  else res.push(`context  = you asked for ${fint(o.ctx * 1024)} tokens; this model supports ${fint(m.ctx)}`);
+  res.push(`fit score = 10·log10(${fmt(m.cap, 1)}B capability × ${fmt(qual(e.bits), 3)} quality) + 1.2·log10(${fdl(m.dl)} downloads) = ${fmt(score(m, e.bits), 1)}`);
+  return h("div", { class: "math" }, L.map(t => h("div", {}, t)), res.map(t => h("div", { class: "res" }, t)));
+}
+function fixesEl(m, cards, o) {
+  const F = fixesFor(m, cards, o);
+  return h("div", { class: "fixes" },
+    h("div", { class: "label" }, `What would it take to run ${m.name} ${F.target}?`),
+    F.list.map(f => h("div", { class: "fix " + f.st },
+      h("span", { class: "mark" }, f.st === "yes" ? "✓" : f.st === "warn" ? "!" : "✗"),
+      h("div", { style: "min-width:0" }, h("div", { class: "ftitle" }, f.t), h("div", { class: "fmath" }, f.d)),
+      h("span", { class: "kind " + f.kind }, f.kind === "free" ? "free" : f.kind === "slow" ? "free, slow" : "buy"))));
+}
+
+// ---------- controls (built once, so dragging a slider never loses focus) ----------
+function slider(key, outId, fmtV) {
+  const el = $("r-" + key), arr = V[key];
+  el.min = 0; el.max = arr.length - 1; el.step = 1;
+  const sync = () => { $(outId).textContent = fmtV(S[key === "min" ? "minTps" : key]); };
+  el.value = Math.max(0, arr.indexOf(S[key === "min" ? "minTps" : key]));
+  el.addEventListener("input", () => { S[key === "min" ? "minTps" : key] = arr[+el.value]; S.limit = 40; sync(); schedule(); });
+  sync();
+}
+slider("ram", "o-ram", v => v + " GB");
+slider("ctx", "o-ctx", v => fctx(v) + " tokens");
+slider("users", "o-users", v => String(v));
+slider("min", "o-min", v => v + " tok/s");
+$("r-util").value = S.util; $("o-util").textContent = S.util + "%";
+$("r-util").addEventListener("input", e => { S.util = +e.target.value; $("o-util").textContent = S.util + "%"; schedule(); });
+$("mac-raise").addEventListener("change", e => { S.macRaise = e.target.checked; schedule(); });
+$("allow-off").addEventListener("change", e => { S.offload = e.target.checked; schedule(); });
+$("ram-bw").addEventListener("change", e => { S.ramBw = +e.target.value; schedule(); });
+
+const wq = $("wq");
+wq.append(h("option", { value: "auto" }, "Auto: best precision that fits"));
+[...new Set(QUANTS.map(q => q[2]))].forEach(g => wq.append(h("optgroup", { label: g }, QUANTS.filter(q => q[2] === g).map(q => h("option", { value: q[0] }, `${q[0]} · ${q[1]} bits`)))));
+wq.addEventListener("change", e => { S.wq = e.target.value; $("floor-ctl").hidden = S.wq !== "auto"; schedule(); });
+LADDER.forEach(q => $("floor").append(h("option", { value: q, selected: q === S.floor || false }, `${q} · ${BITS[q]} bits`)));
+$("floor").addEventListener("change", e => { S.floor = e.target.value; schedule(); });
+KVQ.forEach(([q, b]) => $("kvq").append(h("option", { value: q, selected: q === S.kvq || false }, `${q} · ${b} bytes/value`)));
+$("kvq").addEventListener("change", e => { S.kvq = e.target.value; schedule(); });
+$("split").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { S.split = b.dataset.v; schedule(); }));
+
+const orgs = [...new Set(MODELS.map(m => m.org))].map(o => [o, MODELS.filter(m => m.org === o).length]).sort((a, b) => b[1] - a[1]);
+$("f-org").append(h("option", { value: "all" }, `All orgs (${orgs.length})`), orgs.map(([o, n]) => h("option", { value: o }, `${o} (${n})`)));
+for (const [id, key] of [["f-org","org"],["f-size","size"],["f-kind","kind"],["f-arch","arch"],["f-lic","lic"],["f-src","src"],["f-sort","sort"]])
+  $(id).addEventListener("change", e => { S[key] = e.target.value; S.limit = 40; schedule(); });
+
+// combobox helper
+function combo(input, listEl, getItems, onPick) {
+  let items = [], idx = 0;
+  const close = () => { listEl.hidden = true; input.setAttribute("aria-expanded", "false"); };
+  const draw = () => {
+    items = getItems(input.value); idx = Math.min(idx, Math.max(0, items.length - 1)); listEl.textContent = "";
+    if (!items.length) { close(); return; }
+    let lastGrp = null;
+    items.forEach((it, i) => {
+      if (it.grp && it.grp !== lastGrp) { listEl.append(h("div", { class: "grp" }, it.grp)); lastGrp = it.grp; }
+      listEl.append(h("button", { type: "button", role: "option", "aria-selected": String(i === idx), onmousedown: ev => ev.preventDefault(), onclick: () => { onPick(it); close(); } }, h("span", {}, it.label), h("span", { class: "sub" }, it.sub || "")));
+    });
+    listEl.hidden = false; input.setAttribute("aria-expanded", "true");
+  };
+  input.addEventListener("input", () => { idx = 0; draw(); });
+  input.addEventListener("focus", draw);
+  input.addEventListener("blur", () => setTimeout(close, 120));
+  input.addEventListener("keydown", e => {
+    if (listEl.hidden) return;
+    if (e.key === "ArrowDown") { idx = Math.min(items.length - 1, idx + 1); draw(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { idx = Math.max(0, idx - 1); draw(); e.preventDefault(); }
+    else if (e.key === "Enter" && items[idx] && items[idx].pickOnEnter !== false) { onPick(items[idx]); close(); e.preventDefault(); }
+    else if (e.key === "Escape") close();
+  });
+}
+combo($("gpu-q"), $("gpu-list"), v => {
+  const t = v.trim().toLowerCase(), num = parseFloat(t);
+  const all = [...GPUS, CUSTOM];
+  const hits = all.filter(g => !t || g.name.toLowerCase().replace(/\s+/g, "").includes(t.replace(/\s+|gb$/g, "")) || (!isNaN(num) && /^\d+(\s*gb)?$/.test(t) && g.vram === num) || g.group.toLowerCase().includes(t));
+  return hits.slice(0, 40).map(g => ({ label: g.name, sub: g === CUSTOM ? "set VRAM & bandwidth" : `${g.vram} GB · ${fint(g.bw)} GB/s`, grp: g.group, g }));
+}, it => {
+  const g = it.g;
+  if (g.uni || S.cards.some(c => gpu(c.g).uni)) S.cards = [{ g: g.name, n: 1 }];
+  else { const ex = S.cards.find(c => c.g === g.name); if (ex) ex.n = Math.min(8, ex.n + 1); else S.cards.push({ g: g.name, n: 1 }); }
+  $("gpu-q").value = ""; renderCards(); schedule();
+});
+combo($("mq"), $("m-list"), v => {
+  if (!v.trim()) return [];
+  const f = parseQuery(v);
+  return MODELS.filter(m => matchQ(m, f)).sort((a, b) => b.dl - a.dl).slice(0, 8)
+    .map(m => ({ label: m.id, sub: `${fmt(m.p, 1)}B${m.a ? ` · ${fmt(m.a, 1)}B active` : ""} · ${fdl(m.dl)} dl`, m }));
+}, it => { S.pin = it.m.id; S.open = it.m.id + ":why"; schedule(); });
+$("mq").addEventListener("input", e => { S.q = e.target.value; S.limit = 40; schedule(); });
+document.querySelectorAll(".hint code").forEach(c => c.addEventListener("click", () => { $("mq").value = c.textContent; S.q = c.textContent; S.limit = 40; schedule(); }));
+$("more").addEventListener("click", () => { S.limit += 40; schedule(); });
+["cust-vram", "cust-bw"].forEach(id => $(id).addEventListener("input", () => { CUSTOM.vram = Math.max(1, +$("cust-vram").value || 1); CUSTOM.bw = Math.max(10, +$("cust-bw").value || 10); renderCards(); schedule(); }));
+
+function renderCards() {
+  const el = $("cards"); el.textContent = "";
+  if (!S.cards.length) S.cards = [{ g: "RTX 4090", n: 1 }];
+  const total = S.cards.reduce((s, c) => s + c.n, 0);
+  S.cards.forEach((c, i) => {
+    const g = gpu(c.g);
+    el.append(h("div", { class: "cardrow" },
+      h("div", { style: "min-width:0" }, h("div", { class: "nm" }, g.name), h("div", { class: "sp" }, `${g.vram} GB · ${fint(g.bw)} GB/s${g.uni ? " · unified" : ""}`)),
+      h("div", { class: "stepper" },
+        h("button", { "aria-label": "fewer", disabled: c.n <= 1 || false, onclick: () => { c.n--; renderCards(); schedule(); } }, "−"),
+        h("span", {}, "×" + c.n),
+        h("button", { "aria-label": "more", disabled: !!g.uni || total >= 8 || false, onclick: () => { c.n++; renderCards(); schedule(); } }, "+")),
+      h("button", { class: "x", "aria-label": "remove " + g.name, disabled: S.cards.length === 1 || false, onclick: () => { S.cards.splice(i, 1); renderCards(); schedule(); } }, "×")));
+  });
+  $("custom-box").hidden = !S.cards.some(c => c.g === CUSTOM.name);
+}
+
+// ---------- render: what can I run ----------
+function renderRun() {
+  $("split").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.split)));
+  const o = cfgFrom(S), R = rig(S.cards, o), list = filtered();
+  const rows = sorted(list.map(m => ({ m, c: classify(m, R, o) })));
+  const counts = { fit: 0, slow: 0, off: 0, none: 0 }; rows.forEach(r => counts[r.c.st]++);
+
+  const sum = $("summary"); sum.textContent = "";
+  sum.append(h("div", {}, h("div", { class: "label" }, "Your rig"),
+    h("div", { class: "rig" }, S.cards.map(c => `${c.n}× ${c.g}`).join(" + ")),
+    h("div", { class: "note mono" }, `${fmt(R.usable)} GB usable of ${R.raw} GB · ${fint(R.effBW)} GB/s${R.tp ? " (TP)" : ""} · ${fctx(S.ctx)} ctx · ${S.users} user${S.users > 1 ? "s" : ""} · ≥${S.minTps} tok/s`)),
+    h("div", { class: "counts" }, Object.keys(counts).map(k => h("button", { class: "pill s-" + k, "aria-pressed": String(S.show[k]), title: "Show or hide", onclick: () => { S.show[k] = !S.show[k]; schedule(); } }, h("i", { class: "dot" }), `${counts[k]} ${ST_NAME[k].toLowerCase()}`))));
+
+  const un = $("unlock"); un.textContent = "";
+  const ul = unlocks(list, o);
+  un.append(h("div", { class: "label", style: "margin-bottom:8px" }, "Biggest unlock for your money · models that would run well"));
+  un.append(ul.length ? h("div", { class: "unlock-list" }, ul.map(u => h("div", { class: "unlock-item" },
+    h("div", { class: "delta" }, `+${u.gained.length} model${u.gained.length > 1 ? "s" : ""}`), h("div", { class: "what" }, u.label),
+    h("div", { class: "note mono" }, `+${u.add} GB`), h("div", { class: "names" }, "incl. " + u.gained.slice(0, 3).map(m => m.name).join(", ")))))
+    : h("div", { class: "note" }, "Nothing on the upgrade list adds a model under these filters."));
+
+  let shown = rows.filter(r => S.show[r.c.st]);
+  const pinRow = S.pin ? rows.find(r => r.m.id === S.pin) || (() => { const m = MODELS.find(x => x.id === S.pin); return m ? { m, c: classify(m, R, o), outside: true } : null; })() : null;
+  if (pinRow) shown = shown.filter(r => r.m.id !== S.pin);
+  $("list-title").textContent = `${shown.length.toLocaleString()} of ${MODELS.length} models · ${$("f-sort").selectedOptions[0].text.toLowerCase()}`;
+  $("list-note").textContent = S.wq === "auto" ? `Auto precision, down to ${S.floor}` : `All at ${S.wq}`;
+
+  const box = $("rows"); box.textContent = "";
+  const rankOf = new Map(rows.map((r, i) => [r.m.id, i + 1]));
+  const drawRow = (r, pinned) => {
+    const { m, c } = r, e = c.e, over = !e.fits && !c.off;
+    const why = S.open === m.id + ":why", take = S.open === m.id + ":take";
+    const cap = c.off ? h("div", { class: "bar-cap" }, h("span", {}, `${fmt(e.total)} GB needed`), h("span", { class: "bad" }, `${fmt(c.off.spill)} GB → RAM`))
+      : over ? h("div", { class: "bar-cap" }, h("span", {}, `${fmt(e.total)} / ${fmt(e.usable)} GB`), h("span", { class: "bad" }, c.ctxLimit ? c.why : `short ${fmt(c.short)} GB`))
+      : h("div", { class: "bar-cap" }, h("span", {}, `${fmt(e.total)} / ${fmt(e.usable)} GB`), h("span", {}, `${fmt(e.usable - e.total)} free`));
+    const tps = c.off ? c.off.tps : e.fits ? e.tps : null;
+    const row = h("div", { class: "row" + (pinned ? " pinned" : "") },
+      h("div", { class: "rank" }, pinned ? "pin" : "#" + rankOf.get(m.id)),
+      h("div", { style: "min-width:0" },
+        h("div", { class: "mname" }, h("span", { class: "org" }, m.org + " / "), m.name),
+        h("div", { class: "mmeta" }, h("span", {}, m.a ? `${fmt(m.p, 1)}B · ${fmt(m.a, 1)}B active` : `${fmt(m.p, 1)}B`), h("span", {}, fctx(Math.round(m.ctx / 1024)) + " ctx"),
+          h("span", {}, m.lic), m.vision ? h("span", {}, "vision") : null, h("span", {}, m.chat ? "chat" : "base"), h("span", {}, fdl(m.dl) + " dl"), pinned && r.outside ? h("span", {}, "outside current filters") : null)),
+      qchip(c),
+      h("div", { class: "bar-cell" }, bar(e, over || !!c.off), cap),
+      h("div", { class: "tps" }, tps == null ? h("small", {}, "—") : [tps < 10 ? fmt(tps) : fint(tps), h("small", {}, " tok/s")]),
+      h("div", { class: "actions" },
+        h("button", { "aria-expanded": String(why), onclick: () => { S.open = why ? null : m.id + ":why"; schedule(); } }, "Why?"),
+        c.st !== "fit" || S.pin === m.id ? h("button", { class: "take", "aria-expanded": String(take), onclick: () => { S.open = take ? null : m.id + ":take"; schedule(); } }, "What would it take?") : null,
+        h("a", { href: HF + m.id, target: "_blank", rel: "noopener" }, "HF ↗"),
+        pinned ? h("button", { onclick: () => { S.pin = null; schedule(); } }, "Unpin") : null));
+    if (why) row.append(h("div", { class: "detail" }, mathLines(m, c, R, o)));
+    if (take) row.append(h("div", { class: "detail" }, fixesEl(m, S.cards, o)));
+    return row;
+  };
+  if (pinRow) box.append(drawRow(pinRow, true));
+  shown.slice(0, S.limit).forEach(r => box.append(drawRow(r, false)));
+  if (!shown.length && !pinRow) box.append(h("div", { class: "empty" }, "No models match. Clear the search, widen the filters, or turn a hidden group back on above."));
+  $("more").hidden = shown.length <= S.limit;
+  $("more").textContent = `Show ${Math.min(40, shown.length - S.limit)} more (${shown.length - S.limit} left)`;
+}
+
+// ---------- render: GPU pages ----------
+const art = n => /^(Radeon|Tesla)/.test(n) ? "a" : "an";
+function go(p) { S.page = p; render(); $("page").scrollIntoView({ block: "nearest" }); }
+function renderPages() {
+  const nav = $("gpulist"); nav.textContent = "";
+  const t = $("pg-q").value.trim().toLowerCase().replace(/\s+/g, "");
+  GROUPS.forEach(grp => {
+    const gs = GPUS.filter(g => g.group === grp && (!t || g.name.toLowerCase().replace(/\s+/g, "").includes(t)));
+    if (!gs.length) return;
+    nav.append(h("h3", { class: "label" }, grp));
+    gs.forEach(g => nav.append(h("button", { class: "g", "aria-current": String(S.page.gpu === g.slug), onclick: () => go({ kind: "gpu", gpu: g.slug }) }, h("span", {}, g.name), h("span", {}, g.vram + " GB"))));
+  });
+  const page = $("page"); page.textContent = "";
+  const G = GPUS.find(g => g.slug === S.page.gpu) || GPUS.find(g => g.name === "RTX 4090");
+  const M = MODELS.find(m => m.slug === S.page.model);
+  const o = PAGE_CFG;
+  const stamp = h("div", { class: "stamp" }, "Pre-rendered at 8K context, 1 user, auto precision down to q4_k_m, fp16 KV, ≥10 tok/s, 64 GB RAM · Hugging Face snapshot " + SNAP.generated + " · estimates, not benchmarks · ",
+    h("button", { class: "linkish", onclick: () => { S.cards = [{ g: G.name, n: 1 }]; if (M) { S.pin = M.id; S.open = M.id + ":why"; } renderCards(); setTab("run"); } }, "Open in the app with my settings →"));
+  const modelPicker = (label, onPick) => {
+    const wrap = h("div", { class: "combo" }), inp = h("input", { type: "search", placeholder: label, autocomplete: "off" }), lst = h("div", { class: "combo-list", hidden: "" });
+    wrap.append(inp, lst);
+    combo(inp, lst, v => v.trim() ? MODELS.filter(m => matchQ(m, parseQuery(v))).sort((a, b) => b.dl - a.dl).slice(0, 8).map(m => ({ label: m.id, sub: `${fmt(m.p, 1)}B`, m })) : [], it => onPick(it.m));
+    return wrap;
+  };
+
+  if (S.page.kind === "gpu") {
+    $("url").textContent = `blaine-hiers.github.io/Loadout/gpu/${G.slug}`;
+    const R = rig([{ g: G.name, n: 1 }], o);
+    const rows = MODELS.map(m => ({ m, c: classify(m, R, o) })).sort((a, b) => ST_ORDER[a.c.st] - ST_ORDER[b.c.st] || b.c.sc - a.c.sc);
+    const fit = rows.filter(r => r.c.st === "fit");
+    page.append(
+      h("div", { class: "crumbs" }, h("span", {}, "GPUs"), h("span", {}, "/"), h("span", {}, G.name)),
+      h("h2", { class: "q" }, `What runs on ${art(G.name)} ${G.name}?`),
+      h("div", { class: "answer s-" + (fit.length ? "fit" : "none") }, fit.length ? `${fit.length} of ${MODELS.length} models run well. The best fit is ${fit[0].m.name} at ${fit[0].c.e.q}.` : "No model in the snapshot runs well on this card at these settings."),
+      h("div", { class: "specs" }, h("span", {}, "memory ", h("b", {}, G.vram + " GB")), h("span", {}, "usable ", h("b", {}, fmt(R.usable) + " GB")), h("span", {}, "bandwidth ", h("b", {}, fint(G.bw) + " GB/s"))),
+      modelPicker(`Check a model on the ${G.name}…`, m => go({ kind: "pair", gpu: G.slug, model: m.slug })));
+    const pl = h("div", { class: "plist" });
+    for (const st of ["fit", "slow", "off"]) {
+      const l = rows.filter(r => r.c.st === st); if (!l.length) continue;
+      pl.append(h("h3", {}, h("span", { class: "pill s-" + st }, h("i", { class: "dot" }), ST_NAME[st]), h("span", { class: "note" }, st === "fit" ? `top ${Math.min(15, l.length)} of ${l.length}, best fit first` : `top ${Math.min(5, l.length)} of ${l.length}`)));
+      l.slice(0, st === "fit" ? 15 : 5).forEach((r, i) => pl.append(h("button", { class: "pi", onclick: () => go({ kind: "pair", gpu: G.slug, model: r.m.slug }) },
+        h("span", { class: "rank" }, String(i + 1)), h("span", { class: "mname" }, h("span", { class: "org" }, r.m.org + " / "), r.m.name),
+        h("span", { class: "qchip s-" + st }, r.c.e.q), h("span", { class: "tps" }, `${r.c.off ? fmt(r.c.off.tps) : fint(r.c.e.tps)} tok/s`))));
+    }
+    page.append(pl);
+    const peers = GPUS.filter(g => g.group === G.group && g !== G).sort((a, b) => Math.abs(a.vram - G.vram) - Math.abs(b.vram - G.vram) || b.vram - a.vram).slice(0, 3);
+    const mine = new Set(fit.map(r => r.m.id));
+    page.append(h("div", { class: "cmp" }, h("div", { class: "label" }, "Similar cards"), peers.map(p => {
+      const theirs = new Set(MODELS.filter(m => classify(m, rig([{ g: p.name, n: 1 }], o), o).st === "fit").map(m => m.id));
+      const adds = [...theirs].filter(n => !mine.has(n)).length, loses = [...mine].filter(n => !theirs.has(n)).length;
+      return h("div", {}, h("button", { class: "linkish", onclick: () => go({ kind: "gpu", gpu: p.slug }) }, p.name), ` (${p.vram} GB, ${fint(p.bw)} GB/s): ${theirs.size} run well${adds ? `, ${adds} more than this card` : ""}${loses ? `${adds ? " and" : ","} ${loses} fewer` : ""}.`);
+    })), stamp);
+  } else if (S.page.kind === "pair" && M) {
+    $("url").textContent = `blaine-hiers.github.io/Loadout/gpu/${G.slug}/${M.slug}`;
+    const R = rig([{ g: G.name, n: 1 }], o), c = classify(M, R, o);
+    const ans = c.st === "fit" ? `Yes. ${c.e.q}, ${fmt(c.e.usable - c.e.total)} GB to spare, ~${fint(c.e.tps)} tok/s.`
+      : c.st === "slow" ? `It fits at ${c.e.q}, but only ~${fmt(c.e.tps)} tok/s.`
+      : c.st === "off" ? `Only with RAM offload: ${c.e.q} with ${fmt(c.off.spill)} GB in system RAM, ~${fmt(c.off.tps)} tok/s.`
+      : c.ctxLimit ? `No. ${c.why}.` : `No. It's ${fmt(c.short)} GB short at ${c.e.q}.`;
+    const F = fixesFor(M, [{ g: G.name, n: 1 }], o).list, best = F.find(f => f.st === "yes") || F.find(f => f.st === "warn");
+    page.append(
+      h("div", { class: "crumbs" }, h("button", { onclick: () => go({ kind: "gpu", gpu: G.slug }) }, G.name), h("span", {}, "/"), h("button", { onclick: () => go({ kind: "model", gpu: G.slug, model: M.slug }) }, M.id)),
+      h("h2", { class: "q" }, `Can ${art(G.name)} ${G.name} run ${M.name}?`),
+      h("div", { class: "answer s-" + c.st }, ans),
+      h("div", { class: "detail" }, h("div", { class: "label" }, "The math"), mathLines(M, c, R, o)));
+    if (c.st !== "fit" && best) page.append(h("div", { class: "detail" }, h("div", { class: "label" }, "Closest fix"),
+      h("div", { class: "fix " + best.st }, h("span", { class: "mark" }, best.st === "yes" ? "✓" : "!"), h("div", {}, h("div", { class: "ftitle" }, best.t), h("div", { class: "fmath" }, best.d)), h("span", { class: "kind " + best.kind }, best.kind === "buy" ? "buy" : best.kind === "slow" ? "free, slow" : "free"))));
+    page.append(h("div", { class: "cmp" }, h("button", { class: "linkish", onclick: () => go({ kind: "model", gpu: G.slug, model: M.slug }) }, `Every GPU that runs ${M.name} →`), h("a", { href: HF + M.id, target: "_blank", rel: "noopener" }, `${M.id} on Hugging Face ↗`)), stamp);
+  } else if (M) {
+    $("url").textContent = `blaine-hiers.github.io/Loadout/model/${M.slug}`;
+    const opts2 = [];
+    GPUS.forEach(g => (g.uni ? [1] : [1, 2, 4]).forEach(n => {
+      const R = rig([{ g: g.name, n }], o), c = classify(M, R, o);
+      if (c.st === "fit") opts2.push({ g, n, c, raw: R.raw });
+    }));
+    opts2.sort((a, b) => a.raw - b.raw || b.c.e.tps - a.c.e.tps);
+    page.append(
+      h("div", { class: "crumbs" }, h("span", {}, "Models"), h("span", {}, "/"), h("span", {}, M.id)),
+      h("h2", { class: "q" }, `What hardware runs ${M.name}?`),
+      h("div", { class: "specs" }, h("span", {}, "params ", h("b", {}, M.a ? `${fmt(M.p, 1)}B / ${fmt(M.a, 1)}B active` : fmt(M.p, 1) + "B")), h("span", {}, "context ", h("b", {}, fctx(Math.round(M.ctx / 1024)))), h("span", {}, "license ", h("b", {}, M.lic)), h("span", {}, "q4_k_m weights ", h("b", {}, fmt(M.p * 4.85 / 8) + " GB"))),
+      h("div", { class: "answer s-" + (opts2.length ? "fit" : "none") }, opts2.length ? `Smallest setup that runs it well: ${opts2[0].n > 1 ? opts2[0].n + "× " : ""}${opts2[0].g.name} (${opts2[0].raw} GB) at ${opts2[0].c.e.q}, ~${fint(opts2[0].c.e.tps)} tok/s.` : "Nothing up to 4 cards of one kind runs it well at these settings."));
+    const pl = h("div", { class: "plist" }, h("h3", {}, "Ranked smallest first"));
+    opts2.slice(0, 15).forEach((x, i) => pl.append(h("button", { class: "pi", onclick: () => go({ kind: "pair", gpu: x.g.slug, model: M.slug }) },
+      h("span", { class: "rank" }, String(i + 1)), h("span", { class: "mname" }, `${x.n > 1 ? x.n + "× " : ""}${x.g.name}`, h("span", { class: "org" }, `  ${x.raw} GB`)),
+      h("span", { class: "qchip s-fit" }, x.c.e.q), h("span", { class: "tps" }, `${fint(x.c.e.tps)} tok/s`))));
+    page.append(pl, stamp);
+  }
+}
+
+// ---------- tabs ----------
+function setTab(t) { S.tab = t; try { localStorage.setItem("loadout-tab", t); } catch (e) {} render(); window.scrollTo({ top: 0 }); }
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+$("pg-q").addEventListener("input", () => renderPages());
+
+function render() {
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === S.tab)));
+  $("view-run").hidden = S.tab !== "run";
+  $("view-pages").hidden = S.tab !== "pages";
+  if (S.tab === "run") renderRun(); else renderPages();
+}
+renderCards();
+render();
+})();
+</script>
+</body>
+</html>
